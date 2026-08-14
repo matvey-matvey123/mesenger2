@@ -5,7 +5,7 @@ let allUsers = [];
 
 // Инициализация Socket.io
 function initSocket() {
-    socket = io();
+    socket = io(window.location.origin);
     
     socket.on('connect', () => {
         console.log('Подключено к серверу');
@@ -14,12 +14,18 @@ function initSocket() {
         }
     });
     
+    socket.on('connect_error', (error) => {
+        console.error('Ошибка подключения:', error);
+    });
+    
     socket.on('users-updated', (users) => {
+        console.log('Обновление пользователей:', users);
         allUsers = users.filter(u => u.id !== currentUser?.id);
         displayUsers(allUsers);
     });
     
     socket.on('new-message', (message) => {
+        console.log('Новое сообщение:', message);
         if (selectedUser && 
             ((message.senderId === currentUser.id && message.receiverId === selectedUser.id) ||
              (message.senderId === selectedUser.id && message.receiverId === currentUser.id))) {
@@ -28,6 +34,7 @@ function initSocket() {
     });
     
     socket.on('messages-history', (messages) => {
+        console.log('История сообщений:', messages);
         displayMessages(messages);
     });
 }
@@ -38,6 +45,7 @@ function showLogin() {
     document.getElementById('register-form').style.display = 'none';
     document.querySelectorAll('.tab-btn')[0].classList.add('active');
     document.querySelectorAll('.tab-btn')[1].classList.remove('active');
+    document.getElementById('auth-error').textContent = '';
 }
 
 // Показать форму регистрации
@@ -46,6 +54,7 @@ function showRegister() {
     document.getElementById('register-form').style.display = 'flex';
     document.querySelectorAll('.tab-btn')[1].classList.add('active');
     document.querySelectorAll('.tab-btn')[0].classList.remove('active');
+    document.getElementById('auth-error').textContent = '';
 }
 
 // Обработка входа
@@ -53,6 +62,8 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const username = document.getElementById('login-username').value;
     const password = document.getElementById('login-password').value;
+    
+    console.log('Попытка входа:', { username, password });
     
     try {
         const response = await fetch('/api/login', {
@@ -62,15 +73,17 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
         });
         
         const data = await response.json();
+        console.log('Ответ сервера:', data);
         
         if (response.ok) {
             currentUser = data.user;
             localStorage.setItem('token', data.token);
             showMainScreen();
         } else {
-            showError(data.error);
+            showError(data.error || 'Ошибка входа');
         }
     } catch (error) {
+        console.error('Ошибка:', error);
         showError('Ошибка соединения с сервером');
     }
 });
@@ -82,6 +95,8 @@ document.getElementById('register-form').addEventListener('submit', async (e) =>
     const email = document.getElementById('register-email').value;
     const password = document.getElementById('register-password').value;
     const confirmPassword = document.getElementById('register-confirm-password').value;
+    
+    console.log('Попытка регистрации:', { username, email });
     
     if (password !== confirmPassword) {
         showError('Пароли не совпадают');
@@ -96,15 +111,17 @@ document.getElementById('register-form').addEventListener('submit', async (e) =>
         });
         
         const data = await response.json();
+        console.log('Ответ сервера:', data);
         
         if (response.ok) {
             currentUser = data.user;
             localStorage.setItem('token', data.token);
             showMainScreen();
         } else {
-            showError(data.error);
+            showError(data.error || 'Ошибка регистрации');
         }
     } catch (error) {
+        console.error('Ошибка:', error);
         showError('Ошибка соединения с сервером');
     }
 });
@@ -113,9 +130,10 @@ document.getElementById('register-form').addEventListener('submit', async (e) =>
 function showError(message) {
     const errorElement = document.getElementById('auth-error');
     errorElement.textContent = message;
+    errorElement.style.color = '#e53e3e';
     setTimeout(() => {
         errorElement.textContent = '';
-    }, 3000);
+    }, 5000);
 }
 
 // Показать главный экран
@@ -133,11 +151,16 @@ function showMainScreen() {
 // Загрузить пользователей
 async function loadUsers() {
     try {
+        console.log('Загрузка пользователей...');
         const response = await fetch('/api/users');
         const users = await response.json();
+        console.log('Пользователи загружены:', users);
         allUsers = users.filter(u => u.id !== currentUser.id);
         displayUsers(allUsers);
-        socket.emit('user-online', currentUser.id);
+        
+        if (socket) {
+            socket.emit('user-online', currentUser.id);
+        }
     } catch (error) {
         console.error('Ошибка загрузки пользователей:', error);
     }
@@ -148,6 +171,11 @@ function displayUsers(users) {
     const usersList = document.getElementById('users-list');
     usersList.innerHTML = '';
     
+    if (users.length === 0) {
+        usersList.innerHTML = '<div style="padding: 20px; text-align: center; color: #6c757d;">Пользователи не найдены</div>';
+        return;
+    }
+    
     users.forEach(user => {
         const userElement = document.createElement('div');
         userElement.className = 'user-item';
@@ -156,7 +184,7 @@ function displayUsers(users) {
         }
         
         userElement.innerHTML = `
-            <img src="${user.avatar}" alt="Avatar" class="avatar">
+            <img src="${user.avatar}" alt="Avatar" class="avatar" onerror="this.src='https://via.placeholder.com/45'">
             <div class="user-item-info">
                 <div class="user-item-name">${user.username}</div>
                 <div class="user-item-email">${user.email}</div>
@@ -182,10 +210,12 @@ function selectUser(user) {
     document.getElementById('send-btn').disabled = false;
     
     // Загрузить историю сообщений
-    socket.emit('get-messages', {
-        userId: currentUser.id,
-        otherUserId: user.id
-    });
+    if (socket) {
+        socket.emit('get-messages', {
+            userId: currentUser.id,
+            otherUserId: user.id
+        });
+    }
 }
 
 // Отправить сообщение
@@ -193,7 +223,7 @@ function sendMessage() {
     const messageInput = document.getElementById('message-input');
     const messageText = messageInput.value.trim();
     
-    if (!messageText || !selectedUser) return;
+    if (!messageText || !selectedUser || !socket) return;
     
     const messageData = {
         senderId: currentUser.id,
@@ -201,6 +231,7 @@ function sendMessage() {
         text: messageText
     };
     
+    console.log('Отправка сообщения:', messageData);
     socket.emit('send-message', messageData);
     messageInput.value = '';
 }
@@ -237,8 +268,8 @@ function displayMessages(messages) {
     const messagesContainer = document.getElementById('messages-container');
     messagesContainer.innerHTML = '';
     
-    if (messages.length === 0) {
-        messagesContainer.innerHTML = '<div class="no-chat-selected">Нет сообщений</div>';
+    if (!messages || messages.length === 0) {
+        messagesContainer.innerHTML = '<div class="no-chat-selected">Нет сообщений. Начните общение!</div>';
         return;
     }
     
@@ -275,6 +306,7 @@ function logout() {
     document.getElementById('chat-username').textContent = 'Выберите пользователя';
     document.getElementById('chat-avatar').src = '';
     document.getElementById('chat-status').textContent = '';
+    document.getElementById('auth-error').textContent = '';
 }
 
 // Поиск пользователей
@@ -285,7 +317,7 @@ document.getElementById('search-input').addEventListener('input', async (e) => {
         try {
             const response = await fetch(`/api/users/search?query=${encodeURIComponent(query)}`);
             const users = await response.json();
-            const filtered = users.filter(u => u.id !== currentUser.id);
+            const filtered = users.filter(u => u.id !== currentUser?.id);
             displayUsers(filtered);
         } catch (error) {
             console.error('Ошибка поиска:', error);
@@ -303,8 +335,8 @@ document.getElementById('message-input').addEventListener('keypress', (e) => {
     }
 });
 
-// Проверка токена при загрузке
+// Проверка при загрузке страницы
 window.addEventListener('load', () => {
-    const token = localStorage.getItem('token');
-    // Здесь можно добавить проверку токена на сервере
+    console.log('Страница загружена');
+    document.getElementById('login-form').style.display = 'flex';
 });
