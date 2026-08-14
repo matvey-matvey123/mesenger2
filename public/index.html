@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Мессенджер</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
+</head>
+<body>
+    <!-- Экран авторизации -->
+    <div id="auth-screen" class="auth-screen">
+        <div class="auth-container">
+            <h2>Вход в мессенджер</h2>
+            <div class="auth-tabs">
+                <button class="tab-btn active" onclick="showLogin()">Вход</button>
+                <button class="tab-btn" onclick="showRegister()">Регистрация</button>
+            </div>
+            
+            <!-- Форма входа -->
+            <form id="login-form" class="auth-form">
+                <input type="text" id="login-username" placeholder="Имя пользователя или email" required>
+                <input type="password" id="login-password" placeholder="Пароль" required>
+                <button type="submit">Войти</button>
+            </form>
+            
+            <!-- Форма регистрации -->
+            <form id="register-form" class="auth-form" style="display: none;">
+                <input type="text" id="register-username" placeholder="Имя пользователя" required>
+                <input type="email" id="register-email" placeholder="Email" required>
+                <input type="password" id="register-password" placeholder="Пароль" required>
+                <input type="password" id="register-confirm-password" placeholder="Подтвердите пароль" required>
+                <button type="submit">Зарегистрироваться</button>
+            </form>
+            
+            <div id="auth-error" class="error-message"></div>
+        </div>
+    </div>
+
+    <!-- Главный экран -->
+    <div id="main-screen" class="main-screen" style="display: none;">
+        <div class="header">
+            <div class="user-info">
+                <img id="current-user-avatar" src="" alt="Avatar" class="avatar">
+                <span id="current-user-name"></span>
+            </div>
+            <button onclick="logout()" class="logout-btn">Выйти</button>
+        </div>
+        
+        <div class="container">
+            <!-- Список пользователей -->
+            <div class="sidebar">
+                <div class="search-box">
+                    <input type="text" id="search-input" placeholder="Поиск пользователей...">
+                </div>
+                <div id="users-list" class="users-list"></div>
+            </div>
+            
+            <!-- Чат -->
+            <div class="chat-area">
+                <div class="chat-header">
+                    <img id="chat-avatar" src="" alt="Avatar" class="avatar">
+                    <div>
+                        <h3 id="chat-username">Выберите пользователя</h3>
+                        <span id="chat-status" class="status"></span>
+                    </div>
+                </div>
+                <div id="messages-container" class="messages-container">
+                    <div class="no-chat-selected">Выберите пользователя для начала общения</div>
+                </div>
+                <div class="message-input-area">
+                    <input type="text" id="message-input" placeholder="Введите сообщение..." disabled>
+                    <button id="send-btn" onclick="sendMessage()" disabled>Отправить</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
